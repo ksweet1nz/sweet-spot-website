@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apply &mdash; Sweet Spot Advisory</title>
+  <meta name="description" content="Apply for a Sweet Spot Advisory engagement. Three engagements per year. Tell me what is happening in your business.">
+  <meta property="og:title" content="Apply — Sweet Spot Advisory">
+  <meta property="og:description" content="Apply for a Sweet Spot Advisory engagement. Three engagements per year. Tell me what is happening in your business.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body class="no-hero">
+
+<!-- NAV: keep in sync across all pages -->
+<nav class="site-nav">
+  <div class="container">
+    <a href="index.html" class="site-nav__brand">
+      <img src="assets/images/logo.svg" alt="Sweet Spot Advisory" class="site-nav__logo">
+    </a>
+    <button class="site-nav__toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="site-nav__links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="engagement.html">The Engagement</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html" class="btn--nav">Apply</a></li>
+    </ul>
+  </div>
+</nav>
+<!-- /NAV -->
+
+<main>
+
+<!-- ========== APPLICATION ========== -->
+<section class="section first-section">
+  <div class="container">
+    <div class="contact-layout">
+
+      <!-- Left: context panel -->
+      <div class="contact-context">
+        <h2>Three engagements per year.</h2>
+        <p>Every engagement starts with a conversation. Tell me what is happening in your business and where you are stuck. If it looks like a fit I will respond within five business days.</p>
+
+        <ul class="contact-facts">
+          <li>$120,000 &ndash; $150,000 AUD fixed fee</li>
+          <li>Three equal payments</li>
+          <li>Hard stop at twelve weeks</li>
+        </ul>
+
+        <p class="contact-note">I read every application personally. If it is not the right fit I will say so.</p>
+      </div>
+
+      <!-- Right: form panel -->
+      <div class="contact-form-panel">
+        <!-- TODO: Replace FORMSPREE_ENDPOINT_HERE with actual Formspree endpoint URL -->
+        <form id="contact-form" class="contact-form" action="FORMSPREE_ENDPOINT_HERE" method="POST">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="name">Your name</label>
+              <input type="text" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+              <label for="business">Business name</label>
+              <input type="text" id="business" name="business" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="revenue">Annual revenue</label>
+            <select id="revenue" name="revenue" required>
+              <option value="">Select a range</option>
+              <option value="under-1m">Under $1M</option>
+              <option value="1m-3m">$1M&ndash;$3M</option>
+              <option value="3m-7m">$3M&ndash;$7M</option>
+              <option value="7m-15m">$7M&ndash;$15M</option>
+              <option value="15m-plus">$15M+</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="situation">What is broken? Where are you stuck?</label>
+            <textarea id="situation" name="situation" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="referral">How did you find me? <span class="form-optional">(optional)</span></label>
+            <select id="referral" name="referral">
+              <option value="">Select one</option>
+              <option value="referral">Referral from someone I know</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="web-search">Web search</option>
+              <option value="industry-network">Industry network</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn--primary btn--form-submit">Send application</button>
+
+          <div id="form-status" class="form-status"></div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER: keep in sync across all pages -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-inner">
+      <img src="assets/images/SPLogo-Offwhite.svg" alt="Sweet Spot Advisory" class="footer-logo">
+      <span class="footer-copy">&copy; 2026 Sweet Spot Advisory</span>
+      <ul class="footer-links">
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Apply</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+<!-- /FOOTER -->
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>
