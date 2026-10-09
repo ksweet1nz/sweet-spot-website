@@ -84,12 +84,25 @@ Useful options:
 |---|---|
 | `--token <token>` | Re-publish over an existing project (same link) |
 | `--expires 2027-03-31` | The viewer shows "link expired" after this date |
-| `--downloads` | Offer the original GeoTIFFs / LAS for download |
+| `--downloads` | Offer the original files for download: orthomosaic and DSM GeoTIFFs, every LAS block, and a ZIP of the contour, TIN and spot-height files (DXF, SHP, LandXML) |
 | `--webp` | Smaller tiles (GDAL 3.6+) |
 | `--ortho-zoom 16-22` | Override the tile zoom range |
 | `--no-dsm`, `--no-pointcloud` | Leave those layers out |
 
 **Revoking access:** delete the token's folder from the bucket (`rclone purge r2:surveys/<token>`). `--expires` is a courtesy message only; the files stay reachable until you delete them.
+
+## Admin page
+
+`tools/survey_admin.bat` starts a local admin page and opens it in your browser. It lists every survey in the bucket and lets you:
+
+- **Add** a survey from a DJI Terra folder (runs `publish_survey.py` and uploads).
+- **Edit details:** title, client, location, date, notes and link expiry.
+- **Replace data:** re-publish from a Terra folder and keep the same link.
+- **New link:** move the survey to a fresh token, which cuts off everyone holding the old link.
+- **Delete** the survey and all its files.
+- **Copy link** to send to the client and their consultants.
+
+The page is served only to this PC and needs the key in the address it opens with, so it has no login. It uses the `r2` rclone remote and the GDAL that ships with QGIS or OSGeo4W. Pass `--remote` or `--site-url` to the `.bat` if yours differ.
 
 ## Previewing locally
 

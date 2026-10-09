@@ -179,6 +179,8 @@
     setupModeButtons();
     setupTools();
     setupPanel();
+    setupNav();
+    loadElevation();
     updateLayerVisibility();
 
     flyHome(0);
@@ -424,6 +426,8 @@
         cancelDraft();
         state.mode = b.dataset.mode;
         sync();
+        renderNav();
+        updateStatus(null);
 
         var scene = state.viewer.scene;
         var done = scene.morphComplete.addEventListener(function () {
@@ -432,11 +436,100 @@
           renderLayers();
           syncToolAvailability();
           if (state.mode === "3d") applyHeightOffset().then(function () { flyHome(1.2); });
-          else flyHome(0.8);
+          // Cesium resets the 2D camera to the whole globe right after this
+          // event, so wait a frame before zooming back to the survey.
+          else requestAnimationFrame(function () { flyHome(0.8); });
         });
         if (state.mode === "3d") scene.morphTo3D(0.6); else scene.morphTo2D(0.6);
       });
     });
+  }
+
+  // ---------- Navigation help ----------
+
+  var NAV_HELP = {
+    mouse: {
+      "2d": [["Left-click + drag", "Move the map"], ["Scroll wheel", "Zoom in and out"],
+             ["Right-click + drag", "Zoom smoothly"]],
+      "3d": [["Left-click + drag", "Move across the site"], ["Scroll wheel", "Zoom in and out"],
+             ["Ctrl + left-drag", "Tilt and orbit"], ["Middle-click + drag", "Tilt and orbit"],
+             ["Right-click + drag", "Zoom smoothly"]]
+    },
+    touch: {
+      "2d": [["One-finger drag", "Move the map"], ["Pinch", "Zoom in and out"]],
+      "3d": [["One-finger drag", "Move across the site"], ["Pinch", "Zoom in and out"],
+             ["Two-finger drag", "Tilt"], ["Two-finger twist", "Rotate"]]
+    }
+  };
+
+  function setupNav() {
+    var box = bind("nav"), toggle = document.querySelector('[data-action="nav-toggle"]');
+    var collapsed = window.matchMedia("(max-width: 760px)").matches;
+    try { collapsed = (localStorage.getItem("sv-nav") || (collapsed ? "closed" : "open")) === "closed"; } catch (e) {}
+
+    function apply() {
+      box.classList.toggle("is-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+    }
+    toggle.addEventListener("click", function () {
+      collapsed = !collapsed;
+      try { localStorage.setItem("sv-nav", collapsed ? "closed" : "open"); } catch (e) {}
+      apply();
+    });
+    apply();
+    renderNav();
+  }
+
+  function renderNav() {
+    var input = window.matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
+    var list = bind("nav-list");
+    list.innerHTML = "";
+    NAV_HELP[input][state.mode].forEach(function (row) {
+      list.appendChild(el("dt", null, row[0]));
+      list.appendChild(el("dd", null, row[1]));
+    });
+  }
+
+  // ---------- Hover readout (2D) ----------
+
+  var elevation = null;   // { def, data } once the grid has loaded
+
+  function loadElevation() {
+    var def = state.project.elevation;
+    if (!def) return;
+    fetch(resolve(def.url))
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.arrayBuffer();
+      })
+      .then(function (buf) { elevation = { def: def, data: new Int16Array(buf) }; })
+      .catch(function (err) { console.error("Failed to load elevation grid", err); });
+  }
+
+  function elevationAt(lon, lat) {
+    if (!elevation) return null;
+    var d = elevation.def, b = d.bounds;
+    var x = Math.floor((lon - b[0]) / (b[2] - b[0]) * d.width);
+    var y = Math.floor((b[3] - lat) / (b[3] - b[1]) * d.height);
+    if (x < 0 || y < 0 || x >= d.width || y >= d.height) return null;
+    var v = elevation.data[y * d.width + x];
+    return v === d.nodata ? null : d.offset + v * d.scale;
+  }
+
+  function updateStatus(pos) {
+    var bar = bind("status"), scene = state.viewer.scene;
+    var cart = pos && scene.mode === C.SceneMode.SCENE2D
+      ? state.viewer.camera.pickEllipsoid(pos, scene.globe.ellipsoid) : null;
+    if (!cart) { bar.hidden = true; return; }
+
+    var c = C.Cartographic.fromCartesian(cart);
+    var lon = C.Math.toDegrees(c.longitude), lat = C.Math.toDegrees(c.latitude);
+    var elev = elevationAt(lon, lat);
+    bar.innerHTML = "";
+    bar.appendChild(el("span", null, "Lat " + lat.toFixed(6) + "°"));
+    bar.appendChild(el("span", null, "Lon " + lon.toFixed(6) + "°"));
+    if (elevation) bar.appendChild(el("span", null, "Elevation " + (elev == null ? "–" : elev.toFixed(2) + " m")));
+    bar.hidden = false;
   }
 
   // ---------- Measurement ----------
@@ -460,7 +553,11 @@
     handler.setInputAction(function (e) { onClick(e.position); }, C.ScreenSpaceEventType.LEFT_CLICK);
     handler.setInputAction(function () { finishDraft(); }, C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     handler.setInputAction(function () { finishDraft(); }, C.ScreenSpaceEventType.RIGHT_CLICK);
-    handler.setInputAction(function (e) { onMove(e.endPosition); }, C.ScreenSpaceEventType.MOUSE_MOVE);
+    handler.setInputAction(function (e) {
+      onMove(e.endPosition);
+      updateStatus(e.endPosition);
+    }, C.ScreenSpaceEventType.MOUSE_MOVE);
+    state.viewer.scene.canvas.addEventListener("mouseleave", function () { updateStatus(null); });
 
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { cancelDraft(); setTool(null); }

@@ -7,7 +7,8 @@ window.SURVEY_CONFIG = {
   // access token containing project.json, e.g.
   //   https://surveys.sweetspotadvisory.com.au/<token>/project.json
   // When previewing on localhost, projects are read from survey/data/.
-  dataBaseUrl: /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  // Add ?live (before the #token) to preview a project from the bucket instead.
+  dataBaseUrl: /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !/[?&]live\b/.test(location.search)
     ? "data/"
     : "https://surveys.sweetspotadvisory.com.au/",
 

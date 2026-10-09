@@ -71,7 +71,13 @@
     </section>
   </aside>
 
-  <main class="sv-map" id="map"></main>
+  <main class="sv-map" id="map">
+    <div class="sv-nav" data-bind="nav">
+      <button type="button" class="sv-nav__toggle" data-action="nav-toggle" aria-expanded="true">How to navigate</button>
+      <dl class="sv-nav__list" data-bind="nav-list"></dl>
+    </div>
+    <div class="sv-status" data-bind="status" hidden></div>
+  </main>
 </div>
 
 <div class="sv-overlay" data-bind="overlay">

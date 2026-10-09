@@ -306,7 +306,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .sv-downloads a:hover { color: var(--amber-hover); }
-.sv-downloads span { color: var(--advisory-blue); font-weight: 400; }
+.sv-downloads span { color: var(--advisory-blue); font-weight: 400; white-space: nowrap; }
 
 /* ===== OVERLAY (loading / errors) ===== */
 .sv-overlay {
@@ -344,6 +344,58 @@ button { font: inherit; cursor: pointer; }
 .cesium-viewer-toolbar { top: 12px; right: 12px; }
 .sv-map .cesium-widget canvas { cursor: default; }
 .sv-map.is-measuring .cesium-widget canvas { cursor: crosshair; }
+
+/* ===== MAP OVERLAYS (navigation help, hover readout) ===== */
+.sv-nav,
+.sv-status {
+  position: absolute;
+  z-index: 1;
+  background: rgba(26, 43, 69, 0.88);
+  color: var(--off-white);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.sv-nav { top: 12px; right: 12px; max-width: 260px; }
+
+.sv-nav__toggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.sv-nav__toggle::after { content: "\2212"; color: var(--amber); }
+.sv-nav.is-collapsed .sv-nav__toggle::after { content: "+"; }
+.sv-nav.is-collapsed .sv-nav__list { display: none; }
+
+.sv-nav__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  padding: 2px 12px 10px;
+}
+
+.sv-nav__list dt { color: var(--amber); white-space: nowrap; }
+
+.sv-status {
+  right: 12px;
+  bottom: 8px;
+  padding: 5px 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.sv-status span + span { margin-left: 14px; }
 
 /* ===== MOBILE ===== */
 @media (max-width: 760px) {

@@ -23,10 +23,16 @@ import secrets
 import shutil
 import subprocess
 import sys
+import zipfile
+from array import array
 from datetime import date
 from pathlib import Path
 
 DSM_COLOURS = ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"]
+CAD_FOLDERS = ("terra_contour", "terra_tin", "terra_grid")  # DXF / SHP / LandXML outputs
+IMAGE_MAX_PX = 10000  # longest side of the orthomosaic JPEG; larger images fail in common viewers
+ELEVATION_MAX_PX = 1500  # longest side of the hover-readout height grid
+ELEVATION_NODATA = -32768
 GDAL_ENV = dict(os.environ, GDAL_PAM_ENABLED="NO")  # never write .aux.xml into the Terra folder
 
 
@@ -86,12 +92,21 @@ def discover(terra_dir):
     def named(pattern):
         return [p for p in tifs if re.search(pattern, p.name, re.I)]
 
+    def final(paths):
+        # Terra keeps working copies under .temp; only offer the finished outputs.
+        return [p for p in paths if ".temp" not in p.parts]
+
+    # Large surveys are split into blocks with one LAS each; take the whole set.
+    las = final(list(d.rglob("*.las")) + list(d.rglob("*.laz")))
+    las_dir = first(las).parent if las else None
+
     found = {
         "ortho": first(named(r"^result\.tiff?$")) or first(named(r"(ortho|dom)")),
         "dsm": first(named(r"^dsm\.tiff?$")) or first(named(r"dsm")),
         "mesh": first([t for t in tilesets if re.search(r"b3dm", str(t), re.I)]),
         "pointcloud": first([t for t in tilesets if re.search(r"pnts", str(t), re.I)]),
-        "las": first(list(d.rglob("*.las")) + list(d.rglob("*.laz"))),
+        "las": sorted(p for p in las if p.parent == las_dir),
+        "cad": [c for c in (first(final(p for p in d.rglob(name) if p.is_dir())) for name in CAD_FOLDERS) if c],
     }
     # A lone tileset with no recognisable folder name is treated as the mesh.
     if not found["mesh"] and not found["pointcloud"] and len(tilesets) == 1:
@@ -149,6 +164,54 @@ def tile(src, dest, args, zoom=None):
     return levels[0], levels[-1], ext
 
 
+def ortho_image(ortho, dest, work):
+    """A plain JPEG of the orthomosaic that opens in any image viewer."""
+    w, h = gdalinfo(ortho)["size"]
+    scale = min(1, IMAGE_MAX_PX / max(w, h))
+    flat = work / "ortho_flat.tif"
+    # JPEG has no transparency, so fill outside the survey with white.
+    run(["gdalwarp", "-overwrite", "-ts", round(w * scale), round(h * scale), "-r", "average",
+         "-wo", "INIT_DEST=255", "-co", "COMPRESS=DEFLATE", "-co", "TILED=YES", ortho, flat])
+    run(["gdal_translate", "-of", "JPEG", "-co", "QUALITY=88", "-b", 1, "-b", 2, "-b", 3, flat, dest])
+
+
+def elevation_grid(dsm, dest, work):
+    """A small grid of DSM heights the viewer reads for its hover readout.
+
+    Raw little-endian int16, north-up in WGS84; height = offset + value * scale.
+    """
+    w, h = gdalinfo(dsm)["size"]
+    size = [ELEVATION_MAX_PX, 0] if w >= h else [0, ELEVATION_MAX_PX]
+    raw = work / "elevation_f32.bin"
+    run(["gdalwarp", "-overwrite", "-t_srs", "EPSG:4326", "-ts", *size, "-r", "average",
+         "-ot", "Float32", "-dstnodata", -9999, "-of", "ENVI", dsm, raw])
+    info = gdalinfo(raw)
+    corners = info["cornerCoordinates"]
+
+    values = array("f")
+    values.frombytes(raw.read_bytes())
+    if sys.byteorder == "big":
+        values.byteswap()
+    def missing(v):
+        return v == -9999 or v != v   # nodata or NaN
+
+    valid = [v for v in values if not missing(v)]
+    if not valid:
+        return None
+    lo, hi = min(valid), max(valid)
+    offset = (lo + hi) / 2
+    scale = max(0.01, (hi - lo) / 60000)   # centimetres unless the site spans more than 600 m of height
+    grid = array("h", (ELEVATION_NODATA if missing(v) else round((v - offset) / scale) for v in values))
+    if sys.byteorder == "big":
+        grid.byteswap()
+    dest.write_bytes(grid.tobytes())
+    return {
+        "url": dest.name, "width": info["size"][0], "height": info["size"][1],
+        "bounds": [corners["upperLeft"][0], corners["lowerRight"][1], corners["lowerRight"][0], corners["upperLeft"][1]],
+        "offset": round(offset, 3), "scale": scale, "nodata": ELEVATION_NODATA,
+    }
+
+
 def dsm_colour_relief(dsm, work):
     info = gdalinfo(dsm, stats=True)
     band = info["bands"][0]
@@ -191,7 +254,7 @@ def main():
     ap.add_argument("--no-dsm", action="store_true", help="Skip the DSM layer")
     ap.add_argument("--no-pointcloud", action="store_true", help="Skip the point cloud layer")
     ap.add_argument("--downloads", action="store_true",
-                    help="Also offer the original GeoTIFFs / LAS as downloads")
+                    help="Also offer the original GeoTIFFs, LAS and CAD files as downloads")
 
     ap.add_argument("--ortho-zoom", help='Zoom range for ortho tiles, e.g. "15-22" (default: auto)')
     ap.add_argument("--webp", action="store_true", help="Write WebP tiles (smaller; needs GDAL >= 3.6)")
@@ -215,8 +278,11 @@ def main():
         found["pointcloud"] = None
 
     log("Found:")
-    for key in ("ortho", "dsm", "mesh", "pointcloud", "las"):
-        log(f"  {key:<11} {found.get(key) or '-'}")
+    for key in ("ortho", "dsm", "mesh", "pointcloud", "las", "cad"):
+        value = found.get(key)
+        if isinstance(value, list):
+            value = ", ".join(p.name for p in value)
+        log(f"  {key:<11} {value or '-'}")
     if not any(found.get(k) for k in ("ortho", "mesh", "pointcloud")):
         sys.exit("Nothing to publish: no orthomosaic or 3D tiles found.")
 
@@ -262,6 +328,7 @@ def main():
             bounds, _, crs = raster_summary(info)
             coloured, lo, hi = dsm_colour_relief(found["dsm"], work)
             zmin, zmax, ext = tile(coloured, out / "dsm", args)
+            project["elevation"] = elevation_grid(found["dsm"], out / "elevation.bin", work)
             project.setdefault("bounds", bounds)
             project["crs"] = project.get("crs") or crs
             project["layers"].append({
@@ -272,7 +339,10 @@ def main():
                 "legend": {"min": lo, "max": hi, "unit": "m", "colors": DSM_COLOURS},
             })
 
-        for key, name, extra in (("mesh", "3D model", {}), ("pointcloud", "Point cloud", {"pointSize": 2})):
+        # Terra understates the mesh's geometric error, so the viewer's default
+        # screen-space error leaves it on coarse tiles; ask for finer ones.
+        for key, name, extra in (("mesh", "3D model", {"maximumScreenSpaceError": 1}),
+                                 ("pointcloud", "Point cloud", {"pointSize": 2})):
             if not found.get(key):
                 continue
             log(f"\n{name} -> copy 3D Tiles")
@@ -288,16 +358,41 @@ def main():
             log("\nDownloads")
             dl = out / "downloads"
             dl.mkdir()
-            for key, label in (("ortho", "Orthomosaic (GeoTIFF)"), ("dsm", "DSM (GeoTIFF)"),
-                               ("las", "Point cloud (LAS)")):
-                src = found.get(key)
-                if not src or (key == "las" and args.no_pointcloud):
-                    continue
-                dest = dl / f"{key}{Path(src).suffix.lower()}"
-                shutil.copy2(src, dest)
+            def offer(dest, label):
                 project["downloads"].append({
                     "name": label, "url": f"downloads/{dest.name}", "size": human_size(dest.stat().st_size),
                 })
+
+            if found.get("ortho"):
+                dest = dl / "orthomosaic.jpg"
+                ortho_image(found["ortho"], dest, work)
+                offer(dest, "Orthomosaic image (JPEG)")
+
+            for key, label in (("ortho", "Orthomosaic (GeoTIFF)"), ("dsm", "DSM (GeoTIFF)")):
+                src = found.get(key)
+                if not src:
+                    continue
+                dest = dl / f"{key}{Path(src).suffix.lower()}"
+                log(f"  {src}")
+                shutil.copy2(src, dest)
+                offer(dest, label)
+
+            las = [] if args.no_pointcloud else found.get("las") or []
+            for i, src in enumerate(las, 1):
+                part = f" {i} of {len(las)}" if len(las) > 1 else ""
+                dest = dl / (f"pointcloud{Path(src).suffix.lower()}" if len(las) == 1 else Path(src).name)
+                log(f"  {src}")
+                shutil.copy2(src, dest)
+                offer(dest, f"Point cloud{part} ({Path(src).suffix[1:].upper()})")
+
+            if found.get("cad"):
+                dest = dl / "cad.zip"
+                with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+                    for folder in found["cad"]:
+                        log(f"  {folder}")
+                        for f in sorted(p for p in folder.rglob("*") if p.is_file()):
+                            z.write(f, Path(folder.name.replace("terra_", "")) / f.relative_to(folder))
+                offer(dest, "Contours, TIN and spot heights (DXF, SHP, LandXML)")
 
         project = {k: v for k, v in project.items() if v not in (None, "", [])}
         (out / "project.json").write_text(json.dumps(project, indent=2) + "\n")

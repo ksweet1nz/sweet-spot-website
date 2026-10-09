@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Survey Admin</title>
+<style>
+  :root {
+    --navy: #1A2B45; --amber: #F59C29; --amber-hover: #E08A14; --off-white: #F1EFE8;
+    --advisory-blue: #7A8BA8; --mid-grey: #5F5E5A; --border-grey: #D3D1C7; --white: #FFFFFF;
+    --red: #B3392F; --font: "DM Sans", "Segoe UI", Arial, sans-serif; --radius: 2px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--off-white); color: var(--navy); font-size: 15px; line-height: 1.5; }
+  header { background: var(--navy); color: var(--off-white); padding: 16px 24px; display: flex; align-items: baseline; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 500; }
+  header span { color: var(--advisory-blue); font-size: 13px; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h2 { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+  section { background: var(--white); border: 1px solid var(--border-grey); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .bar h2 { margin: 0; }
+
+  button { font: inherit; font-size: 13px; padding: 7px 14px; border: 1px solid var(--navy); background: var(--white);
+           color: var(--navy); border-radius: var(--radius); cursor: pointer; }
+  button:hover { background: var(--off-white); }
+  button.primary { background: var(--amber); border-color: var(--amber); font-weight: 500; }
+  button.primary:hover { background: var(--amber-hover); border-color: var(--amber-hover); }
+  button.danger { border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  form .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--mid-grey); margin-bottom: 4px; }
+  input[type=text], input[type=date], textarea { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--border-grey);
+           border-radius: var(--radius); background: var(--white); color: var(--navy); }
+  textarea { min-height: 60px; resize: vertical; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--navy); margin: 0; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; }
+  .actions { display: flex; gap: 8px; align-items: center; }
+  .note { font-size: 13px; color: var(--mid-grey); }
+  .folders { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .folders button { font-size: 12px; padding: 3px 8px; border-color: var(--border-grey); }
+
+  .survey { border-top: 1px solid var(--border-grey); padding: 16px 0; }
+  .survey:first-child { border-top: 0; padding-top: 0; }
+  .survey__head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+  .survey__title { font-size: 16px; font-weight: 500; }
+  .survey__meta { font-size: 13px; color: var(--mid-grey); }
+  .survey__link { display: flex; gap: 8px; margin: 10px 0; }
+  .survey__link input { flex: 1; font-family: Consolas, monospace; font-size: 12px; }
+  .survey__edit { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-grey); }
+  .expired { color: var(--red); }
+
+  #job { position: sticky; bottom: 0; }
+  #job pre { background: var(--navy); color: var(--off-white); padding: 12px; font-size: 12px; max-height: 220px; overflow: auto;
+             white-space: pre-wrap; border-radius: var(--radius); }
+  #job .status { font-size: 13px; margin: 8px 0; color: var(--mid-grey); }
+  #job a { color: var(--amber-hover); word-break: break-all; }
+  .error { color: var(--red); font-size: 13px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 640px) { form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><h1>Survey Admin</h1><span id="where"></span></header>
+<main>
+
+<section>
+  <div class="bar"><h2 id="form-title">Add a survey</h2></div>
+  <form id="add">
+    <div class="wide">
+      <label for="terra">DJI Terra project folder</label>
+      <input type="text" id="terra" name="terra" placeholder="D:\Terra Processing\Site\Site" required>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="root" placeholder="Look for projects in, e.g. D:\Terra Processing">
+        <button type="button" id="scan">Find projects</button>
+      </div>
+      <div class="folders" id="folders"></div>
+    </div>
+    <div><label for="title">Title</label><input type="text" id="title" name="title" required></div>
+    <div><label for="client">Client</label><input type="text" id="client" name="client"></div>
+    <div><label for="location">Location</label><input type="text" id="location" name="location"></div>
+    <div><label for="date">Capture date</label><input type="date" id="date" name="date"></div>
+    <div class="wide"><label for="description">Notes shown to the client</label><textarea id="description" name="description"></textarea></div>
+    <div><label for="expires">Link expiry (optional)</label><input type="date" id="expires" name="expires"></div>
+    <div style="align-self:end"><label class="check"><input type="checkbox" id="downloads" name="downloads" checked> Offer the original files for download</label></div>
+    <div class="wide actions">
+      <button type="submit" class="primary" id="submit">Publish survey</button>
+      <button type="button" id="cancel-replace" hidden>Cancel</button>
+      <span class="note" id="form-note">Tiles the maps and uploads everything. Large surveys take a while.</span>
+    </div>
+    <p class="error wide" id="add-error"></p>
+  </form>
+</section>
+
+<section>
+  <div class="bar"><h2>Published surveys</h2><button type="button" id="refresh">Refresh</button></div>
+  <div id="surveys"><p class="note">Loading&hellip;</p></div>
+</section>
+
+<section id="job" hidden>
+  <div class="bar"><h2 id="job-title"></h2><button type="button" id="job-close">Hide</button></div>
+  <p class="status" id="job-status"></p>
+  <p id="job-link" hidden>Client link: <a target="_blank" rel="noopener"></a> <button type="button" id="job-copy">Copy</button></p>
+  <pre id="job-log"></pre>
+</section>
+
+</main>
+<script>
+(function () {
+  "use strict";
+  var key = new URLSearchParams(location.search).get("key") || "";
+  var $ = function (id) { return document.getElementById(id); };
+  var replaceToken = null;
+
+  function api(path, body) {
+    var opts = { headers: { "X-Admin-Key": key } };
+    if (body) { opts.method = "POST"; opts.body = JSON.stringify(body); opts.headers["Content-Type"] = "application/json"; }
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Request failed"); return d; });
+    });
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function button(label, cls, onClick) {
+    var b = el("button", cls, label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function copy(text, btn) {
+    navigator.clipboard.writeText(text).then(function () {
+      var old = btn.textContent; btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    });
+  }
+
+  function size(bytes) {
+    var u = ["B", "KB", "MB", "GB", "TB"], i = 0;
+    while (bytes >= 1024 && i < u.length - 1) { bytes /= 1024; i++; }
+    return bytes.toFixed(i ? 1 : 0) + " " + u[i];
+  }
+
+  // ---------- Survey list ----------
+
+  function loadSurveys() {
+    var box = $("surveys");
+    api("/api/surveys").then(function (d) {
+      $("where").textContent = d.remote + "  \u2192  " + d.siteUrl;
+      box.innerHTML = "";
+      if (!d.surveys.length) { box.appendChild(el("p", "note", "No surveys published yet.")); return; }
+      d.surveys.forEach(function (s) { box.appendChild(surveyCard(s)); });
+    }).catch(function (e) {
+      box.innerHTML = "";
+      box.appendChild(el("p", "error", e.message));
+    });
+  }
+
+  function surveyCard(s) {
+    var card = el("div", "survey");
+    var head = el("div", "survey__head");
+    head.appendChild(el("div", "survey__title", s.title || "(no project.json) " + s.token));
+    var sizeEl = el("div", "survey__meta", "");
+    head.appendChild(sizeEl);
+    card.appendChild(head);
+
+    if (s.error) { card.appendChild(el("p", "error", s.error)); }
+    var bits = [s.client, s.location, s.date].filter(Boolean);
+    if (s.layers && s.layers.length) bits.push(s.layers.join(", "));
+    if (s.downloads) bits.push(s.downloads + " downloads");
+    card.appendChild(el("div", "survey__meta", bits.join("  \u00b7  ")));
+    if (s.expires) {
+      var past = new Date(s.expires) < new Date();
+      card.appendChild(el("div", "survey__meta" + (past ? " expired" : ""), (past ? "Link expired " : "Link expires ") + s.expires));
+    }
+
+    var link = el("div", "survey__link");
+    var input = el("input"); input.type = "text"; input.readOnly = true; input.value = s.link;
+    input.addEventListener("focus", function () { input.select(); });
+    link.appendChild(input);
+    var copyBtn = button("Copy link", "primary", function () { copy(s.link, copyBtn); });
+    link.appendChild(copyBtn);
+    link.appendChild(button("Open", "", function () { window.open(s.link, "_blank", "noopener"); }));
+    card.appendChild(link);
+
+    var editBox = el("div", "survey__edit"); editBox.hidden = true;
+    var actions = el("div", "actions");
+    if (!s.error) {
+      actions.appendChild(button("Edit details", "", function () { editBox.hidden = !editBox.hidden; }));
+      actions.appendChild(button("Replace data", "", function () { startReplace(s); }));
+      actions.appendChild(button("New link", "", function () {
+        if (!confirm("Give \"" + s.title + "\" a new link?\n\nThe current link stops working for everyone who has it.")) return;
+        api("/api/relink", { token: s.token }).then(watchJob).catch(alertError);
+      }));
+    }
+    actions.appendChild(button("Delete", "danger", function () {
+      if (!confirm("Delete \"" + (s.title || s.token) + "\" and all its files from the bucket?\n\nThis cannot be undone.")) return;
+      api("/api/delete", { token: s.token }).then(watchJob).catch(alertError);
+    }));
+    card.appendChild(actions);
+
+    if (!s.error) { buildEdit(editBox, s); card.appendChild(editBox); }
+
+    api("/api/size?token=" + encodeURIComponent(s.token)).then(function (d) {
+      sizeEl.textContent = size(d.bytes) + "  \u00b7  " + d.count + " files";
+    }).catch(function () {});
+    return card;
+  }
+
+  function buildEdit(box, s) {
+    var form = el("form");
+    [["title", "Title", "text"], ["client", "Client", "text"], ["location", "Location", "text"],
+     ["date", "Capture date", "date"], ["expires", "Link expiry (optional)", "date"]].forEach(function (f) {
+      var wrap = el("div");
+      wrap.appendChild(el("label", null, f[1]));
+      var input = el("input"); input.type = f[2]; input.name = f[0]; input.value = s[f[0]] || "";
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+    });
+    var wide = el("div", "wide");
+    wide.appendChild(el("label", null, "Notes shown to the client"));
+    var ta = el("textarea"); ta.name = "description"; ta.value = s.description || "";
+    wide.appendChild(ta);
+    form.appendChild(wide);
+
+    var row = el("div", "wide actions");
+    var save = el("button", "primary", "Save details"); save.type = "submit";
+    var msg = el("span", "note", "");
+    row.appendChild(save); row.appendChild(msg);
+    form.appendChild(row);
+
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var body = { token: s.token };
+      new FormData(form).forEach(function (v, k) { body[k] = v; });
+      save.disabled = true; msg.className = "note"; msg.textContent = "Saving\u2026";
+      api("/api/update", body).then(loadSurveys).catch(function (e) {
+        save.disabled = false; msg.className = "error"; msg.textContent = e.message;
+      });
+    });
+    box.appendChild(form);
+  }
+
+  function alertError(e) { alert(e.message); }
+
+  // ---------- Add / replace ----------
+
+  function startReplace(s) {
+    replaceToken = s.token;
+    ["title", "client", "location", "date", "description", "expires"].forEach(function (k) { $(k).value = s[k] || ""; });
+    $("form-title").textContent = "Replace data for \u201c" + s.title + "\u201d";
+    $("submit").textContent = "Re-publish (same link)";
+    $("form-note").textContent = "Replaces every file for this survey. The client link stays the same.";
+    $("cancel-replace").hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("terra").focus();
+  }
+
+  function endReplace() {
+    replaceToken = null;
+    $("add").reset();
+    $("form-title").textContent = "Add a survey";
+    $("submit").textContent = "Publish survey";
+    $("form-note").textContent = "Tiles the maps and uploads everything. Large surveys take a while.";
+    $("cancel-replace").hidden = true;
+  }
+  $("cancel-replace").addEventListener("click", endReplace);
+
+  $("add").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var body = {};
+    new FormData($("add")).forEach(function (v, k) { body[k] = v; });
+    body.downloads = $("downloads").checked;
+    if (replaceToken) body.token = replaceToken;
+    $("add-error").textContent = "";
+    api("/api/publish", body).then(function () { endReplace(); watchJob(); })
+      .catch(function (e) { $("add-error").textContent = e.message; });
+  });
+
+  function scan() {
+    var root = $("root").value.trim();
+    if (!root) return;
+    try { localStorage.setItem("terraRoot", root); } catch (e) {}
+    api("/api/scan?root=" + encodeURIComponent(root)).then(function (d) {
+      var box = $("folders"); box.innerHTML = "";
+      if (!d.folders.length) { box.appendChild(el("span", "note", "No Terra projects found there.")); return; }
+      d.folders.forEach(function (f) {
+        box.appendChild(button(f.replace(root, "").replace(/^[\\/]/, "") || f, "", function () { $("terra").value = f; }));
+      });
+    }).catch(alertError);
+  }
+  $("scan").addEventListener("click", scan);
+  try { $("root").value = localStorage.getItem("terraRoot") || ""; } catch (e) {}
+  if ($("root").value) scan();
+
+  // ---------- Job progress ----------
+
+  var jobSeen = 0, jobId = null, jobTimer = null;
+
+  function watchJob() {
+    $("job").hidden = false;
+    if (!jobTimer) jobTimer = setInterval(pollJob, 1000);
+    pollJob();
+  }
+
+  function pollJob() {
+    api("/api/job?since=" + jobSeen).then(function (j) {
+      if (j.id !== jobId) {
+        jobId = j.id; $("job-log").textContent = ""; $("job-link").hidden = true;
+        if (jobSeen) { jobSeen = 0; return; }
+      }
+      if (!j.id) return;
+      $("job").hidden = false;
+      $("job-title").textContent = j.title + (j.running ? "\u2026" : j.ok ? " \u2014 done" : " \u2014 failed");
+      $("job-status").textContent = j.status || "";
+      if (j.log.length) {
+        var pre = $("job-log");
+        pre.textContent += j.log.join("\n") + "\n";
+        pre.scrollTop = pre.scrollHeight;
+        jobSeen += j.log.length;
+      }
+      if (j.link) {
+        var a = $("job-link").querySelector("a");
+        a.textContent = j.link; a.href = j.link;
+        $("job-link").hidden = false;
+      }
+      if (!j.running) {
+        clearInterval(jobTimer); jobTimer = null;
+        loadSurveys();
+      }
+    }).catch(function () {});
+  }
+  $("job-close").addEventListener("click", function () { $("job").hidden = true; });
+  $("job-copy").addEventListener("click", function () { copy($("job-link").querySelector("a").textContent, $("job-copy")); });
+  $("refresh").addEventListener("click", loadSurveys);
+
+  loadSurveys();
+  // Pick up a job that was already running when the page was opened.
+  api("/api/job?since=0").then(function (j) { if (j.running) watchJob(); }).catch(function () {});
+})();
+</script>
+</body>
+</html>
