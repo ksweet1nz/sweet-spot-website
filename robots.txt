@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /survey/
 
 Sitemap: https://sweetspotadvisory.com.au/sitemap.xml

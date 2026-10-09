@@ -13,6 +13,9 @@ assets/
   css/main.css      Design system and all styles
   js/main.js        Navigation, scroll reveal, form handling
   images/           Logo, mark, and favicon SVGs
+survey/             Client drone survey viewer (see survey/README.md)
+tools/
+  publish_survey.py Publishes a DJI Terra survey to the viewer
 ```
 
 ## Stack

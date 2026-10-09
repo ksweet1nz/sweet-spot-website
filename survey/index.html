@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Survey Viewer</title>
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+
+<header class="sv-bar">
+  <a href="../index.html" class="sv-bar__brand" aria-label="Home">
+    <img src="../assets/images/SPLogo-Offwhite.svg" alt="" class="sv-bar__logo">
+  </a>
+  <div class="sv-bar__title">
+    <span class="sv-bar__client" data-bind="client"></span>
+    <h1 class="sv-bar__project" data-bind="title">Loading survey&hellip;</h1>
+  </div>
+  <div class="sv-mode" role="group" aria-label="View mode">
+    <button type="button" class="sv-mode__btn is-active" data-mode="2d">2D</button>
+    <button type="button" class="sv-mode__btn" data-mode="3d">3D</button>
+  </div>
+  <button type="button" class="sv-bar__panel-toggle" aria-label="Toggle panel" aria-expanded="true">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<div class="sv-body">
+  <aside class="sv-panel" aria-label="Survey panel">
+
+    <section class="sv-section">
+      <h2 class="sv-section__title">Project</h2>
+      <dl class="sv-meta" data-bind="meta"></dl>
+      <p class="sv-desc" data-bind="description"></p>
+    </section>
+
+    <section class="sv-section">
+      <h2 class="sv-section__title">Layers</h2>
+      <ul class="sv-layers" data-bind="layers"></ul>
+    </section>
+
+    <section class="sv-section">
+      <h2 class="sv-section__title">Measure</h2>
+      <div class="sv-tools" role="group" aria-label="Measurement tools">
+        <button type="button" class="sv-tool" data-tool="point">Point</button>
+        <button type="button" class="sv-tool" data-tool="distance">Distance</button>
+        <button type="button" class="sv-tool" data-tool="area">Area</button>
+        <button type="button" class="sv-tool" data-tool="height">Height</button>
+      </div>
+      <p class="sv-hint" data-bind="hint">Pick a tool, then click on the map.</p>
+      <ol class="sv-measures" data-bind="measures"></ol>
+      <div class="sv-measure-actions">
+        <button type="button" class="sv-link" data-action="export">Export GeoJSON</button>
+        <button type="button" class="sv-link" data-action="clear">Clear all</button>
+      </div>
+    </section>
+
+    <section class="sv-section" data-bind="downloads-section" hidden>
+      <h2 class="sv-section__title">Downloads</h2>
+      <ul class="sv-downloads" data-bind="downloads"></ul>
+    </section>
+
+    <section class="sv-section sv-section--foot">
+      <button type="button" class="sv-link" data-action="home">Zoom to survey</button>
+      <button type="button" class="sv-link" data-action="share">Copy link</button>
+    </section>
+  </aside>
+
+  <main class="sv-map" id="map"></main>
+</div>
+
+<div class="sv-overlay" data-bind="overlay">
+  <div class="sv-overlay__box">
+    <p class="sv-overlay__title" data-bind="overlay-title">Loading survey&hellip;</p>
+    <p class="sv-overlay__text" data-bind="overlay-text"></p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
+<script src="viewer.js"></script>
+</body>
+</html>
