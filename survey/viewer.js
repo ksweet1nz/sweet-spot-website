@@ -170,12 +170,16 @@
       infoBox: false,
       selectionIndicator: false,
       requestRenderMode: true,
+      // Draw at the screen's real pixel density so high-DPI displays stay sharp.
+      useBrowserRecommendedResolution: false,
       maximumRenderTimeChange: Infinity
     });
     state.viewer = viewer;
 
     viewer.scene.globe.baseColor = NAVY;
     viewer.scene.globe.depthTestAgainstTerrain = false;
+    // Default (2) settles a level short of the sharpest map tiles.
+    viewer.scene.globe.maximumScreenSpaceError = 1;
     viewer.scene.skyAtmosphere.show = true;
     viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_CLICK);

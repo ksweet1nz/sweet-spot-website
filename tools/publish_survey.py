@@ -17,6 +17,7 @@ for --upload, rclone. Run with --help for options.
 
 import argparse
 import json
+import math
 import os
 import re
 import secrets
@@ -143,6 +144,22 @@ def covered_area_ha(info):
     w, h = info["size"]
     px = abs(info["geoTransform"][1] * info["geoTransform"][5])
     return round(w * h * px * (alpha["mean"] / 255) / 10000, 2)
+
+
+def native_zoom_range(info, bounds):
+    """Zoom levels down to the first one at least as sharp as the raster itself.
+
+    gdal2tiles stops at the level nearest the source resolution, which can be
+    coarser than the survey (e.g. 1.5 cm tiles from a 0.98 cm orthomosaic).
+    """
+    wkt = info.get("coordinateSystem", {}).get("wkt", "")
+    if not wkt.startswith(("PROJCRS", "PROJCS")) or "geoTransform" not in info:
+        return None  # pixel size isn't in metres; let gdal2tiles decide
+    gsd = abs(info["geoTransform"][1])
+    lat = math.radians((bounds[1] + bounds[3]) / 2)
+    zmax = math.ceil(math.log2(156543.03392 * math.cos(lat) / gsd))
+    zmin = zmax - math.ceil(math.log2(max(info["size"]) / 256))
+    return f"{max(zmin, 0)}-{zmax}"
 
 
 def tile(src, dest, args, zoom=None):
@@ -314,7 +331,8 @@ def main():
             log("\nOrthomosaic -> tiles")
             info = gdalinfo(found["ortho"], stats=True)
             bounds, gsd, crs = raster_summary(info)
-            zmin, zmax, ext = tile(found["ortho"], out / "ortho", args, args.ortho_zoom)
+            zoom = args.ortho_zoom or native_zoom_range(info, bounds)
+            zmin, zmax, ext = tile(found["ortho"], out / "ortho", args, zoom)
             project.update({"bounds": bounds, "gsd": gsd, "crs": crs, "areaHa": covered_area_ha(info)})
             project["layers"].append({
                 "id": "ortho", "name": "Orthomosaic", "type": "imagery",
