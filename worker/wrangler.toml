@@ -1,0 +1,24 @@
+# Survey access log: records when a client link is opened and which files
+# are downloaded. See survey/README.md ("Access log") for setup.
+name = "survey-log"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+# Sweet Spot Advisory account (kevin.sweet.nz@gmail.com), so a deploy can never land elsewhere.
+account_id = "a0bb0166a567b8f4493c8ba1cb4457d3"
+
+routes = [
+  { pattern = "surveys.sweetspotadvisory.com.au/_api/*", zone_name = "sweetspotadvisory.com.au" }
+]
+
+[[r2_buckets]]
+binding = "SURVEYS"
+bucket_name = "surveys"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "survey-log"
+database_id = "9bfd53fe-9903-415b-ae2f-a02756ba1a36"
+
+# Secret (not in this file): ADMIN_KEY, read by the admin page.
+#   npx wrangler secret put ADMIN_KEY

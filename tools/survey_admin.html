@@ -53,6 +53,10 @@
   .survey__link input { flex: 1; font-family: Consolas, monospace; font-size: 12px; }
   .survey__edit { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-grey); }
   .expired { color: var(--red); }
+  .survey__activity { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-grey); }
+  .survey__activity table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .survey__activity th { text-align: left; font-weight: 500; color: var(--mid-grey); padding: 4px 8px 4px 0; }
+  .survey__activity td { padding: 4px 8px 4px 0; border-top: 1px solid var(--off-white); vertical-align: top; }
 
   #job { position: sticky; bottom: 0; }
   #job pre { background: var(--navy); color: var(--off-white); padding: 12px; font-size: 12px; max-height: 220px; overflow: auto;
@@ -184,17 +188,35 @@
       card.appendChild(el("div", "survey__meta" + (past ? " expired" : ""), (past ? "Link expired " : "Link expires ") + s.expires));
     }
 
+    if (s.activity) {
+      var a = s.activity;
+      card.appendChild(el("div", "survey__meta", a.views
+        ? "Opened " + plural(a.views, "time") + " by " + plural(a.visitors, "visitor") + "  ·  " +
+          plural(a.downloads, "download") + "  ·  last " + when(a.last)
+        : "Not opened yet"));
+    } else if (s.activityError) {
+      card.appendChild(el("div", "survey__meta expired", "Access log unavailable: " + s.activityError));
+    }
+
     var link = el("div", "survey__link");
     var input = el("input"); input.type = "text"; input.readOnly = true; input.value = s.link;
     input.addEventListener("focus", function () { input.select(); });
     link.appendChild(input);
     var copyBtn = button("Copy link", "primary", function () { copy(s.link, copyBtn); });
     link.appendChild(copyBtn);
-    link.appendChild(button("Open", "", function () { window.open(s.link, "_blank", "noopener"); }));
+    // ?nolog keeps your own visits out of the access log.
+    link.appendChild(button("Open", "", function () { window.open(s.link.replace("#", "?nolog#"), "_blank", "noopener"); }));
     card.appendChild(link);
 
     var editBox = el("div", "survey__edit"); editBox.hidden = true;
+    var activityBox = el("div", "survey__activity"); activityBox.hidden = true;
     var actions = el("div", "actions");
+    if (s.activity) {
+      actions.appendChild(button("Activity", "", function () {
+        activityBox.hidden = !activityBox.hidden;
+        if (!activityBox.hidden) loadActivity(activityBox, s.token);
+      }));
+    }
     if (!s.error) {
       actions.appendChild(button("Edit details", "", function () { editBox.hidden = !editBox.hidden; }));
       actions.appendChild(button("Replace data", "", function () { startReplace(s); }));
@@ -209,12 +231,46 @@
     }));
     card.appendChild(actions);
 
+    card.appendChild(activityBox);
     if (!s.error) { buildEdit(editBox, s); card.appendChild(editBox); }
 
     api("/api/size?token=" + encodeURIComponent(s.token)).then(function (d) {
       sizeEl.textContent = size(d.bytes) + "  \u00b7  " + d.count + " files";
     }).catch(function () {});
     return card;
+  }
+
+  function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+
+  function when(ts) {
+    if (!ts) return "–";
+    return new Date(ts).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function loadActivity(box, token) {
+    box.innerHTML = "";
+    box.appendChild(el("p", "note", "Loading…"));
+    api("/api/activity?token=" + encodeURIComponent(token)).then(function (d) {
+      box.innerHTML = "";
+      if (!d.events.length) { box.appendChild(el("p", "note", "Nobody has opened this link yet.")); return; }
+      var table = el("table"), head = el("tr");
+      ["When", "What", "Where", "Device", "Visitor"].forEach(function (h) { head.appendChild(el("th", null, h)); });
+      table.appendChild(head);
+      d.events.forEach(function (e) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, when(e.ts)));
+        tr.appendChild(el("td", null, e.event === "download" ? "Downloaded " + (e.file || "").replace(/^downloads\//, "") : "Opened link"));
+        tr.appendChild(el("td", null, [e.city, e.region, e.country].filter(Boolean).join(", ") || "–"));
+        tr.appendChild(el("td", null, e.device || "–"));
+        tr.appendChild(el("td", null, e.visitor || "–"));
+        table.appendChild(tr);
+      });
+      box.appendChild(table);
+      box.appendChild(el("p", "note", "Visitor is a short code per person and device, so you can tell repeat visits apart. Your own visits from the Open button aren't logged."));
+    }).catch(function (e) {
+      box.innerHTML = "";
+      box.appendChild(el("p", "error", e.message));
+    });
   }
 
   function buildEdit(box, s) {

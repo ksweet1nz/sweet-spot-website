@@ -104,6 +104,26 @@ Useful options:
 
 The page is served only to this PC and needs the key in the address it opens with, so it has no login. It uses the `r2` rclone remote and the GDAL that ships with QGIS or OSGeo4W. Pass `--remote` or `--site-url` to the `.bat` if yours differ.
 
+## Access log
+
+The `worker/` folder holds a Cloudflare Worker on `surveys.sweetspotadvisory.com.au/_api/*` that records each time a client link is opened and each file downloaded (downloads are served through it). Events go into a D1 database, `survey-log`. The admin page shows a summary on each survey card and an **Activity** list with time, file, approximate location, device and a short visitor code. No raw IP addresses are stored. Links opened with `?nolog`, which the admin page's **Open** button adds, are not logged, and neither is anything on `localhost`.
+
+Setup (once, from `worker/`, logged in to the Sweet Spot Cloudflare account with `npx wrangler login`):
+
+```bash
+npx wrangler d1 execute survey-log --remote --file schema.sql
+npx wrangler secret put ADMIN_KEY        # any long random string
+npx wrangler deploy
+```
+
+Then save the same key for the admin page in `%APPDATA%\SweetSpot\survey-admin.json`:
+
+```json
+{ "logUrl": "https://surveys.sweetspotadvisory.com.au/_api/", "logKey": "<the ADMIN_KEY>" }
+```
+
+If a `CLOUDFLARE_API_TOKEN` environment variable for another account is set on the PC, clear it for these commands; `wrangler.toml` pins the Sweet Spot account ID, so a deploy to the wrong account fails instead of landing there.
+
 ## Previewing locally
 
 ```bash

@@ -12,6 +12,12 @@ window.SURVEY_CONFIG = {
     ? "data/"
     : "https://surveys.sweetspotadvisory.com.au/",
 
+  // Access log (worker/): records link opens and downloads. Off when
+  // previewing on localhost, and for links opened with ?nolog.
+  logUrl: /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || /[?&]nolog\b/.test(location.search)
+    ? null
+    : "https://surveys.sweetspotadvisory.com.au/_api/",
+
   // Shown in the panel footer and error screens.
   contactEmail: "kevin@sweetspotadvisory.com.au",
 

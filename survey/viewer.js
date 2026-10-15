@@ -100,6 +100,7 @@
     }
 
     var base = new URL(cfg.dataBaseUrl || "data/", location.href).href.replace(/\/?$/, "/");
+    state.token = token;
     state.projectUrl = base + token + "/project.json";
 
     fetch(state.projectUrl, { cache: "no-cache" })
@@ -114,12 +115,23 @@
         }
         state.project = p;
         start();
+        logView();
       })
       .catch(function (err) {
         console.error(err);
         showOverlay("Survey not found", null,
           contactHtml("We couldn't find a survey for this link."));
       });
+  }
+
+  function logView() {
+    if (!cfg.logUrl) return;
+    // text/plain keeps this a simple request, so no CORS preflight.
+    fetch(cfg.logUrl + "view", {
+      method: "POST", mode: "no-cors", keepalive: true,
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ token: state.token })
+    }).catch(function () {});
   }
 
   // ---------- Viewer ----------
@@ -402,7 +414,10 @@
     items.forEach(function (d) {
       var li = el("li");
       var a = el("a");
-      a.href = resolve(d.url);
+      // Through the access log when it's on, so downloads are recorded.
+      a.href = cfg.logUrl && /^downloads\/[^/]+$/.test(d.url)
+        ? cfg.logUrl + "dl/" + state.token + "/" + d.url
+        : resolve(d.url);
       a.setAttribute("download", "");
       a.appendChild(el("strong", null, d.name));
       if (d.size) a.appendChild(el("span", null, d.size));

@@ -23,6 +23,8 @@ import shutil
 import subprocess
 import sys
 import threading
+import urllib.parse
+import urllib.request
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,7 +34,10 @@ from urllib.parse import parse_qs, urlparse
 TOOLS = Path(__file__).resolve().parent
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{6,128}")
 EDITABLE = ("title", "client", "date", "location", "description", "expires")
-RCLONE_NOISE = ("Transferred:", "Checks:", "Elapsed time:", "Transferring:", "*", "Errors:", "Deleted:", "Renamed:")
+RCLONE_NOISE = ("Transferred:", "Checks:", "Elapsed time:", "Transferring:", "*", "Errors:", "Deleted:", "Renamed:",
+                "Checking:")
+# Access log settings written when the log Worker was set up: {"logUrl": ..., "logKey": ...}
+LOG_CONFIG = Path(os.environ.get("APPDATA", str(Path.home()))) / "SweetSpot" / "survey-admin.json"
 
 ARGS = None
 KEY = secrets.token_urlsafe(24)
@@ -67,6 +72,17 @@ def read_project(token):
     return json.loads(rclone("cat", remote(token, "project.json")))
 
 
+def log_api(path):
+    """Call the access-log Worker (worker/). None when it isn't set up on this PC."""
+    if not LOG_CONFIG.exists():
+        return None
+    cfg = json.loads(LOG_CONFIG.read_text(encoding="utf-8"))
+    req = urllib.request.Request(cfg["logUrl"].rstrip("/") + "/" + path,
+                                 headers={"Authorization": "Bearer " + cfg["logKey"], "User-Agent": "survey-admin"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read())
+
+
 def list_surveys():
     tokens = [t.rstrip("/") for t in rclone("lsf", ARGS.remote, "--dirs-only").splitlines()]
     tokens = [t for t in tokens if TOKEN_RE.fullmatch(t)]
@@ -84,6 +100,17 @@ def list_surveys():
 
     with ThreadPoolExecutor(8) as pool:
         surveys = list(pool.map(load, tokens))
+    try:
+        activity = log_api("summary")
+    except Exception as e:  # the list still works without the log
+        activity = {"error": str(e)}
+    if activity and "surveys" in activity:
+        by_token = {row["token"]: row for row in activity["surveys"]}
+        for s in surveys:
+            s["activity"] = by_token.get(s["token"], {"views": 0, "downloads": 0, "visitors": 0, "last": None})
+    elif activity:
+        for s in surveys:
+            s["activityError"] = activity["error"]
     return sorted(surveys, key=lambda s: (s.get("date") or "", s.get("title") or ""), reverse=True)
 
 
@@ -244,6 +271,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not TOKEN_RE.fullmatch(token):
                     raise RuntimeError("Invalid link token.")
                 return self.reply(json.loads(rclone("size", remote(token), "--json")))
+            if url.path == "/api/activity":
+                token = parse_qs(url.query)["token"][0]
+                if not TOKEN_RE.fullmatch(token):
+                    raise RuntimeError("Invalid link token.")
+                result = log_api("log?token=" + urllib.parse.quote(token))
+                if result is None:
+                    raise RuntimeError(f"Access log not set up on this PC ({LOG_CONFIG} missing).")
+                return self.reply(result)
             if url.path == "/api/scan":
                 return self.reply({"folders": scan_terra(parse_qs(url.query).get("root", [""])[0])})
             if url.path == "/api/job":
